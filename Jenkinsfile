@@ -133,25 +133,31 @@ pipeline {
             }
         }
         
-        stage('Setup Kubernetes Resources') {
+        stage('Deploy to EKS') {
             steps {
                 script {
                     sh '''
-                        echo "Setting up Kubernetes resources..."
+                        echo "Deploying to EKS..."
                         
                         # Update kubeconfig
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
                         
-                        # Create namespace if it doesn't exist
-                        kubectl create namespace flask-app --dry-run=client -o yaml | kubectl apply -f -
+                        # Check if deployment exists, if not apply manifests first
+                        if ! kubectl get deployment flask-app -n flask-app >/dev/null 2>&1; then
+                            echo "Deployment doesn't exist, creating initial resources..."
+                            kubectl apply -f k8s/namespace.yaml
+                            kubectl apply -f k8s/deployment.yaml
+                            kubectl apply -f k8s/service.yaml
+                            kubectl apply -f k8s/hpa.yaml
+                        fi
                         
-                        # Apply all Kubernetes manifests
-                        kubectl apply -f k8s/namespace.yaml
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
-                        kubectl apply -f k8s/hpa.yaml
+                        # Update deployment image
+                        kubectl set image deployment/flask-app flask-app=${DOCKER_HUB_REPO}:${IMAGE_TAG} -n flask-app
                         
-                        echo "Kubernetes resources created/updated"
+                        # Wait for deployment to be ready
+                        kubectl rollout status deployment/flask-app -n flask-app --timeout=600s
+                        
+                        echo "Deployment completed successfully"
                     '''
                 }
             }
