@@ -331,3 +331,52 @@ Environment variables:
 - **IAM Roles**: Least privilege access patterns
 - **VPC Endpoints**: Recommended for secure AWS API access
 
+#Commands used
+```
+aws eks update-kubeconfig --region ap-south-1 --name flask-app-cluster
+
+------------------------------------------------------------------------
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run tests
+pytest test_app.py -v
+
+# Run the app locally
+python app.py
+
+------------------------------------------------------------------------
+docker build -t flask-app:local .
+docker run -p 5000:5000 flask-app:local
+
+------------------------------------------------------------------------
+# This is ECR alternative since I dont have access:
+# Login to Docker Hub (you'll need your Docker Hub credentials)
+docker login
+
+# Tag your image for Docker Hub
+docker tag flask-app:latest xxradeonxfx/flask-app:latest
+
+# Push to Docker Hub
+docker push xxradeonxfx/flask-app:latest
+
+
+-------------------------------------------------------------------------
+# Create namespace
+kubectl apply -f k8s/namespace.yaml
+
+# Deploy application
+kubectl apply -f k8s/deployment.yaml
+
+# Create service
+kubectl apply -f k8s/service.yaml
+
+# Create HPA
+kubectl apply -f k8s/hpa.yaml
+
+```
