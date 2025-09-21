@@ -380,3 +380,97 @@ kubectl apply -f k8s/service.yaml
 kubectl apply -f k8s/hpa.yaml
 
 ```
+
+
+## Jenkins CI/CD Pipeline Setup
+
+### Prerequisites
+- Jenkins server with required plugins:
+  - Pipeline
+  - Docker Pipeline 
+  - AWS Steps
+  - Kubernetes CLI
+
+### Step 1: Configure Jenkins Credentials
+
+Add these credentials in Jenkins (Manage Jenkins → Credentials → Global):
+
+1. **AWS Access Key**
+   - Type: Secret text
+   - ID: `prince-access-key-id`
+   - Secret: Your AWS Access Key ID
+
+2. **AWS Secret Key**
+   - Type: Secret text
+   - ID: `prince-secret-access-key`
+   - Secret: Your AWS Secret Access Key
+
+3. **Docker Hub Credentials**
+   - Type: Username with password
+   - ID: `DOCKER-PRINCE-CRED`
+   - Username: Your Docker Hub username
+   - Password: Your Docker Hub password or access token
+
+### Step 2: Create Pipeline Job
+
+1. Go to Jenkins Dashboard
+2. Click "New Item"
+3. Enter name: `flask-app-eks-pipeline`
+4. Select "Pipeline"
+5. Click "OK"
+
+### Step 3: Configure Pipeline
+
+1. **General Tab:**
+   - Description: "Flask App EKS CI/CD Pipeline"
+   - Check "GitHub project" (if using GitHub)
+   - Project URL: Your repository URL
+
+2. **Pipeline Tab:**
+   - Definition: "Pipeline script from SCM"
+   - SCM: Git
+   - Repository URL: Your Git repository URL
+   - Credentials: Add if private repository
+   - Branch Specifier: `*/main` or `*/master`
+   - Script Path: `Jenkinsfile`
+
+### Step 4: Pipeline Environment Setup
+
+The pipeline requires these tools on Jenkins agents:
+- Docker
+- kubectl
+- AWS CLI
+- Python 3.9+
+- Git
+
+### Step 5: Run Pipeline
+
+1. Click "Build Now" to trigger the pipeline
+2. Monitor pipeline stages:
+   - Checkout
+   - Setup Environment
+   - Unit Tests
+   - Code Quality
+   - Build Docker Image
+   - Push to Docker Hub
+   - Setup Kubernetes Resources
+   - Deploy to EKS
+   - Health Check
+   - Integration Tests
+
+
+
+![Jenkins](Screenshots/jenkins.png.png)
+
+### Step 6: Access Application
+
+After successful deployment:
+
+```bash
+# Get LoadBalancer URL
+kubectl get services -n flask-app
+
+# Or use port-forward for testing
+kubectl port-forward service/flask-app-service 8080:80 -n flask-app
+```
+
