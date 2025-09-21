@@ -129,6 +129,7 @@ terraform apply -auto-approve
 aws eks update-kubeconfig --region ap-south-1 --name flask-app-cluster
 kubectl get nodes
 ```
+![aws eks](Screenshots/eks-1.png)
 
 ### 6. Set up Jenkins Pipeline
 1. Create pipeline job in Jenkins
@@ -259,6 +260,9 @@ Environment variables:
 - `FLASK_DEBUG`: Debug mode (false in production)
 - `FLASK_HOST`: Bind address (0.0.0.0)
 - `FLASK_PORT`: Port number (5000)
+
+![eks deployment](Screenshots/k8s-app.png)
+
 
 ## Kubernetes Deployment
 
