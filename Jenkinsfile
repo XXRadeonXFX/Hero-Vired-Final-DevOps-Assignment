@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG = "${BUILD_NUMBER}"
         AWS_ACCESS_KEY_ID = credentials('prince-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('prince-secret-access-key')
-        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials')
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials-prince')
     }
     
     stages {
