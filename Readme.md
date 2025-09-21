@@ -122,6 +122,7 @@ terraform init
 terraform plan
 terraform apply -auto-approve
 ```
+![Daily Alert](output/jenkins-ai-stage.png)
 
 ### 5. Configure kubectl
 ```bash
