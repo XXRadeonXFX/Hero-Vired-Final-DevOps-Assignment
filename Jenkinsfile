@@ -3,12 +3,278 @@ pipeline {
     
     environment {
         AWS_REGION = 'ap-south-1'
-        ECR_REPOSITORY = 'flask-app'
+        DOCKER_HUB_REPO = 'xxradeonxfx/flask-app'
         EKS_CLUSTER_NAME = 'flask-app-cluster'
         IMAGE_TAG = "${BUILD_NUMBER}"
         AWS_ACCESS_KEY_ID = credentials('prince-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('prince-secret-access-key')
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials')
     }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                    env.GIT_SHORT_COMMIT = env.GIT_COMMIT.take(8)
+                }
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                script {
+                    sh '''
+                        # Verify installations
+                        kubectl version --client || echo "kubectl not found"
+                        aws --version
+                        docker --version
+                        python3 --version
+                    '''
+                }
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                script {
+                    sh '''
+                        # Install Python dependencies
+                        python3 -m venv venv
+                        source venv/bin/activate
+                        pip install -r requirements.txt
+                        
+                        # Run tests with coverage
+                        pytest test_app.py -v --cov=app --cov-report=xml --cov-report=html
+                        
+                        # Check test results
+                        if [ $? -ne 0 ]; then
+                            echo "Tests failed!"
+                            exit 1
+                        fi
+                    '''
+                }
+            }
+            post {
+                always {
+                    script {
+                        try {
+                            publishTestResults testResultsPattern: 'test-results.xml'
+                        } catch (Exception e) {
+                            echo "No test results to publish"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Code Quality') {
+            steps {
+                script {
+                    sh '''
+                        source venv/bin/activate
+                        
+                        # Install quality tools
+                        pip install flake8 bandit safety
+                        
+                        # Run linting
+                        flake8 app.py --max-line-length=120 --ignore=E402,W503 || echo "Linting warnings found"
+                        
+                        # Security scan
+                        bandit -r . -f json -o bandit-report.json || echo "Security scan completed with warnings"
+                        
+                        # Dependency vulnerability check
+                        safety check --json --output safety-report.json || echo "Safety check completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh '''
+                        # Build image with multiple tags
+                        docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} .
+                        docker tag ${DOCKER_HUB_REPO}:${IMAGE_TAG} ${DOCKER_HUB_REPO}:latest
+                        docker tag ${DOCKER_HUB_REPO}:${IMAGE_TAG} ${DOCKER_HUB_REPO}:${GIT_SHORT_COMMIT}
+                    '''
+                }
+            }
+        }
+        
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', 
+                                                   usernameVariable: 'DOCKER_USERNAME', 
+                                                   passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh '''
+                            # Login to Docker Hub
+                            echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+                            
+                            # Push images
+                            docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                            docker push ${DOCKER_HUB_REPO}:latest
+                            docker push ${DOCKER_HUB_REPO}:${GIT_SHORT_COMMIT}
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    sh '''
+                        # Update kubeconfig
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                        
+                        # Verify cluster connectivity
+                        kubectl cluster-info
+                        kubectl get nodes
+                        
+                        # Update deployment image
+                        kubectl set image deployment/flask-app flask-app=${DOCKER_HUB_REPO}:${IMAGE_TAG} -n flask-app
+                        
+                        # Wait for deployment to be ready
+                        kubectl rollout status deployment/flask-app -n flask-app --timeout=300s
+                        
+                        # Get service info
+                        kubectl get services -n flask-app
+                        kubectl get pods -n flask-app
+                    '''
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    sh '''
+                        # Wait for pods to be ready
+                        kubectl wait --for=condition=ready pod -l app=flask-app -n flask-app --timeout=300s
+                        
+                        # Get service endpoint
+                        SERVICE_URL=$(kubectl get service flask-app-service -n flask-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                        
+                        if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+                            # Use NodePort or port-forward for testing
+                            kubectl port-forward service/flask-app-service 8080:80 -n flask-app &
+                            sleep 10
+                            SERVICE_URL="localhost:8080"
+                        fi
+                        
+                        # Health check
+                        for i in {1..5}; do
+                            if curl -f http://${SERVICE_URL}/health; then
+                                echo "Health check passed!"
+                                break
+                            else
+                                echo "Health check failed, retrying in 30 seconds..."
+                                sleep 30
+                            fi
+                            
+                            if [ $i -eq 5 ]; then
+                                echo "Health check failed after 5 attempts"
+                                exit 1
+                            fi
+                        done
+                    '''
+                }
+            }
+        }
+        
+        stage('Integration Tests') {
+            steps {
+                script {
+                    sh '''
+                        # Run basic integration tests
+                        source venv/bin/activate
+                        
+                        # Get service URL
+                        SERVICE_URL=$(kubectl get service flask-app-service -n flask-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                        
+                        if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+                            SERVICE_URL="localhost:8080"
+                        fi
+                        
+                        # Basic API tests
+                        python3 -c "
+import requests
+import sys
+import time
+
+base_url = 'http://${SERVICE_URL}'
+try:
+    # Test home endpoint
+    response = requests.get(f'{base_url}/', timeout=10)
+    assert response.status_code == 200
+    print('Home endpoint test passed')
+    
+    # Test health endpoint
+    response = requests.get(f'{base_url}/health', timeout=10)
+    assert response.status_code == 200
+    print('Health endpoint test passed')
+    
+    # Test tasks endpoint
+    response = requests.get(f'{base_url}/tasks', timeout=10)
+    assert response.status_code == 200
+    print('Tasks endpoint test passed')
+    
+    print('All integration tests passed!')
+    
+except Exception as e:
+    print(f'Integration test failed: {e}')
+    sys.exit(1)
+"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                sh '''
+                    # Clean up Docker images to save space
+                    docker image prune -f || echo "Docker cleanup failed"
+                    
+                    # Clean up port-forward processes
+                    pkill -f "kubectl port-forward" || echo "No port-forward to kill"
+                    
+                    # Deactivate virtual environment
+                    deactivate || echo "Virtual environment cleanup"
+                '''
+            }
+            
+            // Archive artifacts
+            archiveArtifacts artifacts: '**/*.json,**/*.xml,**/*.html', allowEmptyArchive: true
+        }
+        
+        success {
+            script {
+                echo "Pipeline completed successfully!"
+                echo "Application deployed to EKS cluster: ${EKS_CLUSTER_NAME}"
+                echo "Docker image pushed: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+            }
+        }
+        
+        failure {
+            script {
+                echo "Pipeline failed!"
+                
+                // Rollback if needed
+                sh '''
+                    echo "Rolling back deployment..."
+                    kubectl rollout undo deployment/flask-app -n flask-app || echo "Rollback failed or not needed"
+                '''
+            }
+        }
+    }
+}
     
     tools {
         terraform 'terraform'
