@@ -94,6 +94,7 @@ pipeline {
                 script {
                     sh '''
                         echo "Building Docker image..."
+                        cd flask-app
                         
                         # Build image with multiple tags
                         docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} .
