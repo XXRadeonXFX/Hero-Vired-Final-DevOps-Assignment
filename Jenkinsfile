@@ -43,6 +43,7 @@ pipeline {
                 script {
                     sh '''
                         echo "Running unit tests..."
+                        cd flask-app
                         python3 -m venv venv
                         . venv/bin/activate
                         pip install --upgrade pip
@@ -59,7 +60,7 @@ pipeline {
                 always {
                     script {
                         try {
-                            publishTestResults testResultsPattern: 'test-results.xml'
+                            publishTestResults testResultsPattern: 'flask-app/test-results.xml'
                         } catch (Exception e) {
                             echo "No test results XML found to publish"
                         }
