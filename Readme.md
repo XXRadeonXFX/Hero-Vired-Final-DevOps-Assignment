@@ -460,7 +460,7 @@ The pipeline requires these tools on Jenkins agents:
 
 
 
-![Jenkins](Screenshots/jenkins.png.png)
+![Jenkins](Screenshots/jenkins.png)
 
 ### Step 6: Access Application
 
