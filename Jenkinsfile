@@ -68,7 +68,8 @@ pipeline {
                 script {
                     sh '''
                         echo "Running code quality checks..."
-                        source venv/bin/activate
+                        cd flask-app
+                        . venv/bin/activate
                         
                         # Install quality tools
                         pip install flake8 bandit safety || echo "Quality tools installation completed"
