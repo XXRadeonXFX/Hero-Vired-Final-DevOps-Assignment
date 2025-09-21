@@ -1,3 +1,109 @@
-prince-pair-x-2.pem
-.terraform
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+.terraform/
 .terraform.lock.hcl
+terraform.tfstate.d/
+crash.log
+crash.*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+.venv/
+.env
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# Docker
+.dockerignore
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jenkins
+.jenkins/
+
+# AWS
+.aws/
+
+# Kubernetes
+kubeconfig*
+*.kubeconfig
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+deployment.env
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Backup files
+*.bak
+*.backup
+
+# Local test files
+test-results.xml
+bandit-report.json
+safety-report.json
+trivy-report.json
