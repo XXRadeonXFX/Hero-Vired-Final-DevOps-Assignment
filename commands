@@ -18,3 +18,16 @@ python app.py
 ------------------------------------------------------------------------
 docker build -t flask-app:local .
 docker run -p 5000:5000 flask-app:local
+
+------------------------------------------------------------------------
+# Create namespace
+kubectl apply -f k8s/namespace.yaml
+
+# Deploy application
+kubectl apply -f k8s/deployment.yaml
+
+# Create service
+kubectl apply -f k8s/service.yaml
+
+# Create HPA
+kubectl apply -f k8s/hpa.yaml

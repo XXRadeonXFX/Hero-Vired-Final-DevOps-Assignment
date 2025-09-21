@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flask-app
+  labels:
+    name: flask-app
+    environment: production
+    team: devops
+  annotations:
+    description: "Namespace for Flask application deployment"
