@@ -47,27 +47,30 @@ resource "aws_ecr_repository" "flask_app" {
     scan_on_push = true
   }
 
-  lifecycle_policy {
-    policy = jsonencode({
-      rules = [
-        {
-          rulePriority = 1
-          description  = "Keep last 30 images"
-          selection = {
-            tagStatus     = "tagged"
-            tagPrefixList = ["v"]
-            countType     = "imageCountMoreThan"
-            countNumber   = 30
-          }
-          action = {
-            type = "expire"
-          }
-        }
-      ]
-    })
-  }
-
   tags = var.tags
+}
+
+# ECR Lifecycle Policy
+resource "aws_ecr_lifecycle_policy" "flask_app_policy" {
+  repository = aws_ecr_repository.flask_app.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 30 images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["v"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 30
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
 }
 
 # ECR Repository Policy
@@ -157,76 +160,9 @@ resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
   role       = aws_iam_role.eks_node_role.name
 }
 
-# Security Group for EKS Cluster
-resource "aws_security_group" "eks_cluster_sg" {
-  name        = "${var.cluster_name}-cluster-sg"
-  description = "Security group for EKS cluster"
-  vpc_id      = var.vpc_id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-cluster-sg"
-  })
-}
-
-resource "aws_security_group_rule" "cluster_ingress_workstation_https" {
-  cidr_blocks       = [var.workstation_cidr]
-  description       = "Allow workstation to communicate with the cluster API Server"
-  from_port         = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.eks_cluster_sg.id
-  to_port           = 443
-  type              = "ingress"
-}
-
-# Security Group for EKS Nodes
-resource "aws_security_group" "eks_nodes_sg" {
-  name        = "${var.cluster_name}-nodes-sg"
-  description = "Security group for EKS nodes"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description = "Allow nodes to communicate with each other"
-    from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
-    self        = true
-  }
-
-  ingress {
-    description     = "Allow worker Kubelets and pods to receive communication from the cluster control plane"
-    from_port       = 1025
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [aws_security_group.eks_cluster_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-nodes-sg"
-  })
-}
-
-resource "aws_security_group_rule" "cluster_ingress_node_https" {
-  description              = "Allow pods to communicate with the cluster API Server"
-  from_port                = 443
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.eks_cluster_sg.id
-  source_security_group_id = aws_security_group.eks_nodes_sg.id
-  to_port                  = 443
-  type                     = "ingress"
+# Data source for existing security group
+data "aws_security_group" "existing" {
+  id = var.existing_security_group_id
 }
 
 # EKS Cluster
@@ -237,7 +173,7 @@ resource "aws_eks_cluster" "main" {
 
   vpc_config {
     subnet_ids              = data.aws_subnets.existing.ids
-    security_group_ids      = [aws_security_group.eks_cluster_sg.id]
+    security_group_ids      = [var.existing_security_group_id]
     endpoint_private_access = true
     endpoint_public_access  = true
     public_access_cidrs     = [var.workstation_cidr]
@@ -274,7 +210,7 @@ resource "aws_eks_node_group" "main" {
 
   remote_access {
     ec2_ssh_key               = var.key_pair_name
-    source_security_group_ids = [aws_security_group.eks_nodes_sg.id]
+    source_security_group_ids = [var.existing_security_group_id]
   }
 
   depends_on = [
