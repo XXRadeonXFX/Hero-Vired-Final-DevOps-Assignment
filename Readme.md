@@ -331,7 +331,7 @@ Environment variables:
 - **IAM Roles**: Least privilege access patterns
 - **VPC Endpoints**: Recommended for secure AWS API access
 
-#Commands used
+## Commands used
 ```
 aws eks update-kubeconfig --region ap-south-1 --name flask-app-cluster
 
