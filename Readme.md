@@ -26,13 +26,13 @@ A complete DevOps implementation demonstrating the deployment of a Python Flask 
 │                 │───▶│   CI/CD         │───▶│   Cluster       │
 │   Git Push      │    │   Pipeline      │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                       │
-                                ▼                       ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │   Docker Hub    │    │ Application     │
-                       │   Registry      │    │ Load Balancer   │
-                       │                 │    │                 │
-                       └─────────────────┘    └─────────────────┘
+                                │              
+                                ▼              
+                       ┌─────────────────┐   
+                       │   Docker Hub    │     
+                       │   Registry      │   
+                       │                 │   
+                       └─────────────────┘    
 ```
 
 ### Components
