@@ -133,31 +133,25 @@ pipeline {
             }
         }
         
-        stage('Deploy to EKS') {
+        stage('Setup Kubernetes Resources') {
             steps {
                 script {
                     sh '''
-                        echo "Deploying to EKS..."
+                        echo "Setting up Kubernetes resources..."
                         
                         # Update kubeconfig
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
                         
-                        # Verify cluster connectivity
-                        kubectl cluster-info
-                        kubectl get nodes
+                        # Create namespace if it doesn't exist
+                        kubectl create namespace flask-app --dry-run=client -o yaml | kubectl apply -f -
                         
-                        # Update deployment image
-                        kubectl set image deployment/flask-app flask-app=${DOCKER_HUB_REPO}:${IMAGE_TAG} -n flask-app
+                        # Apply all Kubernetes manifests
+                        kubectl apply -f k8s/namespace.yaml
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
+                        kubectl apply -f k8s/hpa.yaml
                         
-                        # Wait for deployment to be ready
-                        kubectl rollout status deployment/flask-app -n flask-app --timeout=300s
-                        
-                        # Get service and pod info
-                        echo "Current deployment status:"
-                        kubectl get services -n flask-app
-                        kubectl get pods -n flask-app
-                        
-                        echo "Deployment to EKS completed"
+                        echo "Kubernetes resources created/updated"
                     '''
                 }
             }
